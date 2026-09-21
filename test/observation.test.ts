@@ -121,3 +121,37 @@ test('an account on a plan without overage reports none', () => {
   const o = classify(200, { 'anthropic-ratelimit-unified-5h-utilization': '0.5' });
   assert.equal(o.kind === 'usage' && o.overageActive, false);
 });
+
+test('REGRESSION: a disabled overage pool does not exhaust a barely-used account', () => {
+  // Measured on a real Pro account 2026-09-21. The overage pool was switched
+  // off at org level and still reported utilization 1.0, while the included
+  // five-hour window sat at 11%. Reading overage alone marked the account
+  // exhausted, which pushed the whole session onto the slow Codex path.
+  const o = classify(200, {
+    'anthropic-ratelimit-unified-5h-utilization': '0.11',
+    'anthropic-ratelimit-unified-overage-status': 'rejected',
+    'anthropic-ratelimit-unified-overage-utilization': '1.0',
+  });
+  assert.equal(o.kind === 'usage' && o.overageActive, false);
+  assert.equal(o.kind === 'usage' && o.percent, 11);
+});
+
+test('REGRESSION: overage utilisation with an unfilled window is not spending', () => {
+  // Nothing can have spilled into overage while the included window still
+  // has 98% of its headroom left.
+  const o = classify(200, {
+    'anthropic-ratelimit-unified-5h-utilization': '0.02',
+    'anthropic-ratelimit-unified-overage-utilization': '0.0176',
+  });
+  assert.equal(o.kind === 'usage' && o.overageActive, false);
+});
+
+test('a full window WITH overage is still real spending', () => {
+  // The case the guard must not break: window full, overage ticking up.
+  const o = classify(200, {
+    'anthropic-ratelimit-unified-5h-utilization': '1.0',
+    'anthropic-ratelimit-unified-overage-status': 'allowed',
+    'anthropic-ratelimit-unified-overage-utilization': '0.04',
+  });
+  assert.equal(o.kind === 'usage' && o.overageActive, true);
+});

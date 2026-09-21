@@ -16,6 +16,7 @@ import { timingSafeEqual } from 'node:crypto';
 import { basename } from 'node:path';
 import { Readable } from 'node:stream';
 import { classify, filterResponseHeaders } from '../core/observation.ts';
+import type { Observation } from '../core/observation.ts';
 import { choose, observe, recoverExpired } from '../core/router.ts';
 import type { AccountRuntime, Snapshot } from '../core/router.ts';
 import { discoverAccounts, readCredential, isExpired } from '../accounts/discover.ts';
@@ -161,6 +162,18 @@ export class Gateway extends EventEmitter {
       })),
     };
 
+    // Credentials first, and AWAITED: these are local reads (keychain or
+    // file), and `authorisesCaller()` needs them populated before the very
+    // first request arrives or it answers 401.
+    await Promise.all(accounts.map((a) => this.primeCredential(a)));
+
+    // A disabled account stays discovered but out of rotation. Applied
+    // BEFORE priming: an observation arriving for a disabled account must
+    // find it already marked, or `apply()` would treat it as eligible.
+    for (const account of this.snapshot.accounts) {
+      if (this.config.profiles[account.id]?.enabled === false) account.state = 'disabled';
+    }
+
     // Identity AND current quota, up front. Quota only ever arrives on a
     // response header, so without this the stats page would show empty bars
     // until you happened to send something — which is exactly when you are
@@ -168,15 +181,18 @@ export class Gateway extends EventEmitter {
     //
     // All accounts in parallel, all failures swallowed: this is decoration
     // and a diagnostic, never a precondition for serving traffic.
-    await Promise.all([
+    //
+    // NOT awaited — that is the point. These are two network round-trips per
+    // account, and the usage probe falls back to a request with a 15s
+    // timeout, so awaiting them held the port shut for seconds before
+    // `claude` could send anything. Since they only populate labels and the
+    // dashboard's bars, they now fill in behind the session: the pool serves
+    // traffic immediately and the numbers appear a moment later. Each result
+    // pushes a `usage` event, so the page updates as they land.
+    void Promise.all([
       ...accounts.map((a) => this.prime(a)),
       this.primeCodex(),
-    ]);
-
-    // A disabled account stays discovered but out of rotation.
-    for (const account of this.snapshot.accounts) {
-      if (this.config.profiles[account.id]?.enabled === false) account.state = 'disabled';
-    }
+    ]).then(() => this.emit('usage', this.view()));
   }
 
   /**
@@ -262,6 +278,17 @@ export class Gateway extends EventEmitter {
       // Re-enabling returns it to service immediately; the next response
       // corrects its state if it is actually spent.
       if (account) account.state = changes.enabled ? 'eligible' : 'disabled';
+
+      // Disabling the account that is CURRENTLY SERVING must also clear
+      // `currentId`. `choose()` already refuses to return a non-eligible
+      // account, so rotation itself was correct — but leaving the pointer
+      // behind meant the dashboard kept drawing the disabled account as
+      // active, and the hand-over was logged as though the disabled account
+      // had been serving up to that moment. Clearing it here makes the
+      // switch immediate and visible on the next request.
+      if (changes.enabled === false && this.snapshot.currentId === id) {
+        this.snapshot = { ...this.snapshot, currentId: null };
+      }
     }
 
     // A new order has to be applied to the LIVE pool, not merely saved.
@@ -336,22 +363,55 @@ export class Gateway extends EventEmitter {
     }
   }
 
-  /** Resolve one account's identity and current quota. Best-effort. */
-  private async prime(account: DiscoveredAccount): Promise<void> {
-    let credential;
+  /**
+   * Read one account's credential into memory. LOCAL ONLY — a keychain or
+   * file read, no network.
+   *
+   * Kept separate from the network probe because `authorisesCaller()`
+   * compares against this map: a caller whose credential has not been read
+   * yet gets a spurious 401. So this half must complete before the port
+   * starts serving, while the probe half must not block it.
+   */
+  private async primeCredential(account: DiscoveredAccount): Promise<void> {
     try {
-      credential = await readCredential(account);
+      this.credentials.set(account.id, await readCredential(account));
     } catch {
-      return; // handle() reports an unreadable credential properly when used
+      // handle() reports an unreadable credential properly when used
     }
-    this.credentials.set(account.id, credential);
+  }
+
+  /** Resolve one account's identity and current quota. Best-effort, network. */
+  private async prime(account: DiscoveredAccount): Promise<void> {
+    const credential = this.credentials.get(account.id) ?? null;
+    if (credential === null) return;
 
     const [identity, observation] = await Promise.all([
       fetchIdentity(credential.accessToken),
-      probeUsage(credential.accessToken),
+      // The configured model, so an account's measured health matches what
+      // the session will actually send. Null (nothing forced) keeps the
+      // cheap Haiku default.
+      probeUsage(credential.accessToken, this.config.activeModel),
     ]);
     if (identity) this.identities.set(account.id, identity);
-    if (observation) this.snapshot = observe(this.snapshot, account.id, observation, new Date());
+
+    // A PROBE must not cost an account its place in rotation.
+    //
+    // The probe is a diagnostic: one synthetic request, on a model that may
+    // not be the one the session runs, sent before any real traffic. Folding
+    // a rate-limit answer from it into rotation state put the account into
+    // cooldown — backing off exponentially to 30 minutes — without a single
+    // real request having been tried. Measured: accounts that answered real
+    // traffic perfectly well were parked on startup, and the session spent
+    // itself on the slow Codex fallback instead.
+    //
+    // Usage readings are still folded in: those are the numbers the whole
+    // stats page exists to show, and they take no account out of service.
+    // `auth_invalid` is kept too — a rejected credential is a fact about the
+    // account, not about load. Only the load-shaped answers are dropped, and
+    // the first real request re-learns them if they are true.
+    if (observation && foldableFromProbe(observation)) {
+      this.snapshot = observe(this.snapshot, account.id, observation, new Date());
+    }
   }
 
   /**
@@ -411,7 +471,11 @@ export class Gateway extends EventEmitter {
     await Promise.all([
       ...added.filter((id) => id !== CODEX_ID).map((id) => {
         const account = this.discovered.get(id);
-        return account ? this.prime(account) : Promise.resolve();
+        // A newcomer has no cached credential yet, so read it before the
+        // probe that now depends on it.
+        return account
+          ? this.primeCredential(account).then(() => this.prime(account))
+          : Promise.resolve();
       }),
       added.includes(CODEX_ID) ? this.primeCodex() : Promise.resolve(),
     ]);
@@ -436,7 +500,13 @@ export class Gateway extends EventEmitter {
 
   /** Re-read every account's quota, for the stats page's refresh. */
   async refreshUsage(): Promise<void> {
-    await Promise.all([...this.discovered.values()].map((a) => this.prime(a)));
+    // Re-read any credential missing from the cache — one that failed at
+    // startup, or an account added since — so a manual refresh can recover
+    // an account rather than silently skipping it.
+    await Promise.all([...this.discovered.values()].map(async (a) => {
+      if (!this.credentials.has(a.id)) await this.primeCredential(a);
+      await this.prime(a);
+    }));
     this.emit('usage', this.view());
   }
 
@@ -476,6 +546,19 @@ export class Gateway extends EventEmitter {
   }
 
   async handle(method: string, path: string, headers: Record<string, string>, body: Buffer): Promise<GatewayResult> {
+    // Anything that is not an inference call — model listings, profile and
+    // usage lookups, org metadata — is a plain read that ANY valid
+    // credential can serve. It spends no quota, so an account being in
+    // cooldown or over its window says nothing about whether it can answer.
+    //
+    // These must not go through rotation. Claude Code calls several of them
+    // while starting up, and routing them normally meant: rotation picks the
+    // only eligible account (Codex), `attemptCodex()` declines every
+    // non-messages path, the attempt loop runs out, and the CLI gets a 503.
+    // It then retried and stalled — measured at ~9s to answer "hello" while
+    // the actual inference call took 1.6s.
+    if (!isMessagesPath(path)) return this.passthrough(method, path, headers, body);
+
     const attempted = new Set<string>();
 
     for (let i = 0; i < MAX_ATTEMPTS; i++) {
@@ -517,6 +600,29 @@ export class Gateway extends EventEmitter {
           text: `${this.labelFor(decision.accountId)} needs re-authentication — run \`claude\` for it`,
         });
         this.emit('auth_invalid', { accountId: decision.accountId });
+        continue;
+      }
+      // A rate limit or a transient unavailable: `observe()` has already put
+      // this account into cooldown, so try the NEXT one rather than handing
+      // the client an error while a healthy account sits idle.
+      //
+      // This is not a rotation in the sense CLAUDE.md forbids — the cooled
+      // account keeps its place and returns on its own. What it prevents is
+      // a single 429 surfacing as a failed request when the pool could have
+      // answered it. Measured: a spend-capped account 429s with no
+      // Retry-After on every request, which made the whole session fail even
+      // with two working accounts behind it.
+      //
+      // Nothing has been forwarded yet, so this stays inside the
+      // never-retry-after-committing rule.
+      if (attempt.observation.kind === 'rate_limited' || attempt.observation.kind === 'unavailable') {
+        attempt.discard();
+        this.activity.record({
+          kind: 'limit',
+          accountId: decision.accountId,
+          text: `${this.labelFor(decision.accountId)} is rate limited — trying the next account`,
+        });
+        this.emit('rotate', { from: decision.accountId, reason: attempt.observation.kind });
         continue;
       }
 
@@ -561,6 +667,43 @@ export class Gateway extends EventEmitter {
   }
 
   /**
+   * Serve a non-inference request with whatever Claude credential we hold.
+   *
+   * Quota state is deliberately IGNORED here: these endpoints cost nothing,
+   * so a cooled-down or exhausted account answers them perfectly well.
+   * Nothing is observed from the result either — a 429 on a model listing
+   * must not push an account out of rotation for real work.
+   *
+   * Codex is skipped entirely: it cannot serve these shapes.
+   */
+  private async passthrough(
+    method: string, path: string, headers: Record<string, string>, body: Buffer,
+  ): Promise<GatewayResult> {
+    // Prefer the account currently serving, then anything else we can read,
+    // so this keeps using one warm connection rather than fanning out.
+    const ids = [
+      ...(this.snapshot.currentId !== null && this.snapshot.currentId !== CODEX_ID ? [this.snapshot.currentId] : []),
+      ...this.snapshot.accounts.map((a) => a.id).filter((id) => id !== CODEX_ID && id !== this.snapshot.currentId),
+    ];
+
+    for (const id of ids) {
+      const credential = await this.credentialFor(id);
+      if (credential === null) continue;
+      try {
+        const res = await sendUpstream(
+          buildUpstreamRequest({ accessToken: credential.accessToken, method, path, headers, body }),
+        );
+        return { status: res.status, headers: res.headers, body: res.body, accountId: id };
+      } catch (err) {
+        if (err instanceof UpstreamError) continue; // transport failure: try the next
+        throw err;
+      }
+    }
+
+    return { status: 503, headers: {}, body: null, accountId: null, error: 'no_account_available' };
+  }
+
+  /**
    * One send attempt, deferred body. `body()` is called ONLY after the retry
    * decision is made, so an abandoned attempt never reads a byte — the same
    * invariant on both paths.
@@ -595,9 +738,10 @@ export class Gateway extends EventEmitter {
     const credential = this.codexCredential;
     if (credential === null) return null;
 
-    // Codex speaks only the Messages shape. Anything else (model listings,
-    // token endpoints) it cannot serve, so it declines and rotation moves on.
-    if (!path.replace(/\/+$/, '').endsWith('/v1/messages')) return null;
+    // Codex speaks only the Messages shape. handle() now routes everything
+    // else to passthrough() before rotation, so this is a belt-and-braces
+    // guard rather than the path that fires in practice.
+    if (!isMessagesPath(path)) return null;
 
     let parsed: Record<string, unknown>;
     try {
@@ -727,4 +871,24 @@ function codexPlanLabel(planType: string | null): string {
   const base = planType.replace(/_cbp_usage_based$/, '').replace(/_/g, ' ');
   const pretty = base.charAt(0).toUpperCase() + base.slice(1);
   return planType.endsWith('usage_based') ? `${pretty} · usage-based` : pretty;
+}
+
+
+/** An inference call — the only shape that spends quota and needs rotation. */
+function isMessagesPath(path: string): boolean {
+  return path.replace(/\/+$/, '').endsWith('/v1/messages');
+}
+
+
+/**
+ * May a PROBE's observation change rotation state?
+ *
+ * Usage and auth answers are facts about the account: what it has spent, and
+ * whether its credential is accepted. Rate-limit and unavailable answers are
+ * facts about load at one instant, measured by a synthetic request on a model
+ * the session may not even use — acting on those parked healthy accounts in
+ * a 30-minute backoff before any real traffic was tried.
+ */
+export function foldableFromProbe(observation: Observation): boolean {
+  return observation.kind !== 'rate_limited' && observation.kind !== 'unavailable';
 }

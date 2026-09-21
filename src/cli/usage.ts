@@ -17,6 +17,7 @@ import { discoverAccounts, readCredential, credentialLocationHint } from '../acc
 import type { DiscoveredAccount } from '../accounts/discover.ts';
 import { fetchIdentity, planLabel } from '../accounts/identity.ts';
 import { probeUsage } from '../accounts/probe.ts';
+import { loadConfig } from '../store/config.ts';
 import { readCodexCredential } from '../codex/credential.ts';
 import { fetchCodexUsage } from '../codex/usage.ts';
 
@@ -42,8 +43,12 @@ export async function cmdUsage(): Promise<number> {
     return 1;
   }
 
+  // Same model the session would run, so these numbers describe what a real
+  // request would meet rather than what the cheapest probe model happens to.
+  const { activeModel } = await loadConfig();
+
   process.stderr.write('Reading usage…');
-  const rows = await Promise.all(accounts.map(probeClaude));
+  const rows = await Promise.all(accounts.map((a) => probeClaude(a, activeModel)));
   const codex = await probeCodex();
   if (codex) rows.push(codex);
   process.stderr.write('\r               \r');
@@ -79,7 +84,7 @@ export async function cmdUsage(): Promise<number> {
   return 0;
 }
 
-async function probeClaude(account: DiscoveredAccount): Promise<Row> {
+async function probeClaude(account: DiscoveredAccount, model: string | null): Promise<Row> {
   const base: Row = {
     name: account.label, plan: 'Claude', primary: null, secondary: null,
     resetsAt: null, overage: false, note: null,
@@ -96,7 +101,7 @@ async function probeClaude(account: DiscoveredAccount): Promise<Row> {
   const name = identity?.email ?? account.label;
   const plan = planLabel(identity?.organizationType ?? null) ?? 'Claude';
 
-  const observation = await probeUsage(credential.accessToken);
+  const observation = await probeUsage(credential.accessToken, model);
   if (observation === null) return { ...base, name, plan, note: dim('could not reach the provider') };
 
   switch (observation.kind) {

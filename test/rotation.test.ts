@@ -34,7 +34,12 @@ async function runRotation(
     const observation = classify(res.status, filterResponseHeaders(res.headers));
     snapshot = observe(snapshot, decision.accountId, observation, new Date());
 
-    if (observation.kind === 'quota_exhausted' || observation.kind === 'auth_invalid') {
+    if (
+      observation.kind === 'quota_exhausted' ||
+      observation.kind === 'auth_invalid' ||
+      observation.kind === 'rate_limited' ||
+      observation.kind === 'unavailable'
+    ) {
       continue; // discarded WITHOUT reading the body
     }
     bodiesRead.push(res.readBody()); // committing
@@ -162,4 +167,44 @@ test('a rate limit cools the account down but does NOT rotate away from it', asy
   const later = new Date(Date.now() + 3000);
   const recovered = recoverExpired(s, later);
   assert.equal(recovered.accounts[0]!.state, 'eligible', 'and it returns on its own');
+});
+
+test('REGRESSION: a rate-limited account falls through instead of failing the request', async () => {
+  // A spend-capped account 429s with NO rate-limit headers on every request,
+  // which classifies as a bare `rate_limited`. That put the account into
+  // cooldown but then COMMITTED the 429 to the client, so the session failed
+  // while a healthy account sat idle beside it. Measured against two real
+  // accounts in exactly that state.
+  const server = http.createServer((req, res) => {
+    if (req.headers['x-test-account'] === 'a') {
+      res.writeHead(429, { 'content-type': 'application/json' });
+      res.end('{"type":"error","error":{"type":"rate_limit_error"}}');
+      return;
+    }
+    res.writeHead(200, { 'anthropic-ratelimit-unified-5h-utilization': '0.2' });
+    res.end('served by B');
+  });
+  server.listen(0, '127.0.0.1');
+  await once(server, 'listening');
+  const { port } = server.address() as AddressInfo;
+
+  try {
+    const result = await runRotation(
+      { accounts: [account('a', 1), account('b', 2)], currentId: null },
+      async (accountId) => {
+        const res = await fetch(`http://127.0.0.1:${port}/v1/messages`, {
+          method: 'POST',
+          headers: { 'x-test-account': accountId },
+        });
+        const headers: Record<string, string> = {};
+        res.headers.forEach((v, k) => (headers[k] = v));
+        return { status: res.status, headers, readBody: () => String(res.status) };
+      },
+    );
+
+    assert.equal(result.served, 'b', 'the healthy account must answer');
+    assert.deepEqual(result.attempted, ['a', 'b'], 'a was tried, then handed over');
+  } finally {
+    server.close();
+  }
 });

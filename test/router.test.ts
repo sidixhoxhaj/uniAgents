@@ -230,3 +230,35 @@ test('a disabled account is not revived by a quota or auth observation either', 
     assert.equal(s.accounts[0]!.state, 'disabled', `${o.kind} must not change a disabled account`);
   }
 });
+
+test('REGRESSION: a recovered higher-priority account reclaims the session', () => {
+  // Once the pool fell through to the low-priority Codex fallback, plain
+  // stickiness kept it there for the rest of the session — even after the
+  // preferred Claude account left cooldown. Every request paid the slow
+  // translated path while the fast account sat idle. Measured live: Codex
+  // served 61 requests with an eligible Claude account beside it.
+  const snapshot = {
+    currentId: 'codex',
+    accounts: [
+      account('claude', { priority: 1, state: 'eligible' }),
+      account('codex', { priority: 3, state: 'eligible' }),
+    ],
+  };
+  const decision = choose(snapshot);
+  assert.equal(decision.accountId, 'claude');
+  assert.equal(decision.reason, 'rotated');
+});
+
+test('stickiness still holds against an equal or lower-priority peer', () => {
+  // The behaviour stickiness exists for: do NOT abandon the account already
+  // serving just because a peer is also healthy.
+  const snapshot = {
+    currentId: 'b',
+    accounts: [
+      account('b', { priority: 2, state: 'eligible' }),
+      account('c', { priority: 3, state: 'eligible' }),
+    ],
+  };
+  assert.equal(choose(snapshot).reason, 'sticky');
+  assert.equal(choose(snapshot).accountId, 'b');
+});

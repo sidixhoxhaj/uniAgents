@@ -114,8 +114,21 @@ export function classify(statusCode: number, headers: Record<string, string>): O
         resetsAt: parseReset(headers['anthropic-ratelimit-unified-5h-reset']),
         percent7d: utilization7d === null ? null : round2(utilization7d * 100),
         resetsAt7d: parseReset(headers['anthropic-ratelimit-unified-7d-reset']),
-        // Any overage at all means this account has started costing money.
-        overageActive: overage !== null && overage > 0,
+        // Overage means money is being spent RIGHT NOW, which requires two
+        // things: some overage utilisation, and an included window actually
+        // full enough to have spilled into it.
+        //
+        // The window check is what a bare `overage > 0` missed. A disabled
+        // or stale overage pool can report a non-zero utilisation while the
+        // 5h window sits at 11% — nothing has spilled, nothing is billed —
+        // and treating that as exhausted pushed a healthy account out of
+        // rotation. An explicit `overage-status` of `rejected` also means
+        // the pool cannot be spent, so it is not overage either.
+        overageActive:
+          overage !== null &&
+          overage > 0 &&
+          utilization >= 1 &&
+          headers['anthropic-ratelimit-unified-overage-status'] !== 'rejected',
         overagePercent: overage === null ? 0 : round2(overage * 100),
       };
     }

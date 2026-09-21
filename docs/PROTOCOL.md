@@ -24,6 +24,7 @@ depends on it.
   - [Credential storage shapes](#credential-storage-shapes)
   - [Claude usage can be read for free — `/api/oauth/usage`](#claude-usage-can-be-read-for-free--apioauthusage)
   - [Claude model ids come from Claude Code's own catalog cache](#claude-model-ids-come-from-claude-codes-own-catalog-cache)
+  - [SSE usage: input is three fields, not one](#sse-usage-input-is-three-fields-not-one)
   - [`ANTHROPIC_AUTH_TOKEN` disables hosted connectors — so we never set it](#anthropic_auth_token-disables-hosted-connectors--so-we-never-set-it)
 - [Codex](#codex)
   - [Codex: the ChatGPT backend](#codex-the-chatgpt-backend)
@@ -156,6 +157,42 @@ window silently reports 0% and rotation never fires.
 
 Dropping the header costs nothing on a loopback hop, and the server then
 defaults to identity encoding.
+
+### SSE usage: input is three fields, not one
+
+`src/proxy/usage.ts`
+
+With prompt caching on — which Claude Code always uses — almost none of the
+input arrives as `input_tokens`. The full picture needs all three:
+
+```
+input_tokens                  neither cached nor read from cache
+cache_creation_input_tokens   written to the cache on this request
+cache_read_input_tokens       served from the cache on this request
+```
+
+Measured against a live account, 2026-09-21, with a 2036-token system prompt:
+
+| request | `input_tokens` | `cache_creation` | `cache_read` | real total |
+|---------|---------------|------------------|--------------|------------|
+| first   | 9             | 2027             | 0            | 2036       |
+| second  | 9             | 0                | 2027         | 2036       |
+
+Reading `input_tokens` alone scored **9 of 2036 — 0.4%**. Cached input is
+billable and counts against the window, so this understated every total the
+Logs page renders and every window the router reads.
+
+Two further shape facts, both measured in the same capture:
+
+- **`message_start` nests usage under `message`; `message_delta` has it at
+  the top level.** Reading only `event.message.usage` misses the final
+  revision, and only `event.usage` misses the opening counts.
+- **`message_delta` repeats the whole input breakdown**, not just output. The
+  last event seen therefore wins for every field.
+
+Guard with `!== undefined` rather than truthiness: a legitimate `0` in a
+delta must overwrite an earlier non-zero, which `if (usage.output_tokens)`
+silently skips.
 
 ### `metadata.user_id` is a JSON-encoded string
 

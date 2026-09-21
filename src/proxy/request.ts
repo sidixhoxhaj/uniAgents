@@ -16,6 +16,33 @@
  */
 
 export const ANTHROPIC_BASE_URL = 'https://api.anthropic.com';
+
+/**
+ * The OAuth entitlement marker.
+ *
+ * Anthropic gates premium models (Opus, Sonnet) behind a recognised marker
+ * appearing as the FIRST system block. Without one the request is refused
+ * with a bare 429 that carries NO rate-limit headers and the message
+ * "Error" — indistinguishable from real quota pushback, which is exactly
+ * what made this so hard to see: the router read it as an exhausted account
+ * and rotated away from a login with 95% of its window left.
+ *
+ * Measured against two accounts in different organisations, 2026-09-21:
+ *
+ *   billing-header block first            → 200
+ *   this string first                     → 200
+ *   this string first, user content after → 200
+ *   user content first (marker second)    → 429
+ *   no system block at all                → 429
+ *   claude-haiku-4-5 (any of the above)   → 200   (exempt from the gate)
+ *
+ * The real `claude` CLI always sends its own marker, so this is injected
+ * ONLY when a request arrives without one. See anthropics/claude-code#87420.
+ */
+export const CLAUDE_CODE_SYSTEM = "You are Claude Code, Anthropic's official CLI for Claude.";
+
+/** Markers Anthropic accepts as the first system block. */
+const ENTITLEMENT_PREFIXES = [CLAUDE_CODE_SYSTEM, 'x-anthropic-billing-header:'];
 export const MAX_BODY_BYTES = 20_000_000;
 
 /** Stripped from the inbound request: credential-shaped or hop-by-hop. */
@@ -58,6 +85,9 @@ export function buildUpstreamRequest(opts: {
   headers['Authorization'] = `Bearer ${opts.accessToken}`;
 
   let body = opts.body;
+  if (isMessagesPath(opts.path) && body.length > 0) {
+    body = ensureEntitlementSystem(body);
+  }
   if (opts.accountUuid && isMessagesPath(opts.path) && body.length > 0) {
     body = rewriteAccountUuid(body, opts.accountUuid);
   }
@@ -119,4 +149,58 @@ export function filterOutboundResponseHeaders(headers: Record<string, string | s
     out[k] = Array.isArray(v) ? (v[0] ?? '') : v;
   }
   return out;
+}
+
+
+/**
+ * Put the entitlement marker first when the caller did not send one.
+ *
+ * A request that already leads with a recognised marker is returned
+ * UNTOUCHED — the real CLI sends its own, and rewriting it would risk
+ * breaking a request that already works. Anything unparseable is also
+ * returned untouched: a body we do not understand is not one to rewrite.
+ */
+export function ensureEntitlementSystem(body: Buffer): Buffer {
+  let parsed: unknown;
+  try {
+    parsed = JSON.parse(body.toString('utf8'));
+  } catch {
+    return body;
+  }
+  if (typeof parsed !== 'object' || parsed === null || Array.isArray(parsed)) return body;
+
+  const root = parsed as Record<string, unknown>;
+  const system = root['system'];
+
+  // A plain string system prompt: the gate reads its start the same way.
+  if (typeof system === 'string') {
+    if (leadsWithMarker(system)) return body;
+    root['system'] = [
+      { type: 'text', text: CLAUDE_CODE_SYSTEM },
+      { type: 'text', text: system },
+    ];
+    return Buffer.from(JSON.stringify(root), 'utf8');
+  }
+
+  if (Array.isArray(system)) {
+    const first = system[0];
+    const text = typeof first === 'object' && first !== null
+      ? (first as Record<string, unknown>)['text']
+      : undefined;
+    if (typeof text === 'string' && leadsWithMarker(text)) return body;
+    root['system'] = [{ type: 'text', text: CLAUDE_CODE_SYSTEM }, ...system];
+    return Buffer.from(JSON.stringify(root), 'utf8');
+  }
+
+  // No system block at all — the shape the gate refuses outright.
+  if (system === undefined) {
+    root['system'] = [{ type: 'text', text: CLAUDE_CODE_SYSTEM }];
+    return Buffer.from(JSON.stringify(root), 'utf8');
+  }
+
+  return body;
+}
+
+function leadsWithMarker(text: string): boolean {
+  return ENTITLEMENT_PREFIXES.some((p) => text.startsWith(p));
 }

@@ -207,6 +207,14 @@ re-authentication" over a model choice.
 independently — collapsing them misreads a weekly-cap rejection as a short
 rate limit and retries a dead account.
 
+**Input tokens are three fields, not one.** With prompt caching on, input
+arrives mostly as `cache_creation_input_tokens` and `cache_read_input_tokens`.
+Counting only `input_tokens` recorded 9 of 2036 real tokens — 0.4% — so every
+input total was understated by orders of magnitude. Cached input is billable
+and counts against the window. Also: `message_delta` carries the full input
+breakdown too, and the guard must be `!== undefined`, since a truthiness check
+drops a legitimate `0`.
+
 **Strip `accept-encoding` outbound.** Otherwise responses arrive compressed
 and nothing can read usage out of them: every window silently reports 0%.
 

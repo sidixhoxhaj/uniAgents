@@ -77,6 +77,13 @@ export function sendUpstream(req: UpstreamRequest, timeoutMs = DEFAULT_TIMEOUT_M
       },
     );
 
+    // Nagle off upstream too. The request body is written in one or two
+    // chunks and then we wait on the response, which is exactly the pattern
+    // Nagle delays: the final short segment is held back waiting for an ACK
+    // that only arrives once the peer has the whole body. That is dead time
+    // on the front of every single request.
+    request.on('socket', (socket) => socket.setNoDelay(true));
+
     request.on('timeout', () => {
       request.destroy(new UpstreamError(`upstream timed out after ${timeoutMs}ms`));
     });

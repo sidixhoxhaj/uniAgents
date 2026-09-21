@@ -7,7 +7,8 @@
  * which is what keeps this deterministically testable.
  *
  * Rules:
- *   - Sticky: stay on the current account until it is spent.
+ *   - Sticky: stay on the current account until it is spent — unless a
+ *     HIGHER-priority account has recovered, which reclaims it.
  *   - A bare rate limit is a cooldown, NEVER a rotation away.
  *   - Tie-break: lowest priority number wins; then soonest known reset.
  */
@@ -58,12 +59,24 @@ const BASE_BACKOFF_SECONDS = 30;
 
 export function choose(snapshot: Snapshot): Decision {
   const current = snapshot.accounts.find((a) => a.id === snapshot.currentId);
-  if (current && current.state === 'eligible') {
-    return { accountId: current.id, reason: 'sticky' };
-  }
-
   const candidates = snapshot.accounts.filter((a) => a.state === 'eligible');
   if (candidates.length === 0) return { accountId: null, reason: 'none_available' };
+
+  // Sticky — but only against accounts of EQUAL OR LOWER preference.
+  //
+  // Staying put is right when the alternatives are peers: rotating on a blip
+  // abandons a healthy account for no gain. It is wrong when an account the
+  // user ranked HIGHER has come back. Measured: once the pool fell through
+  // to the Codex fallback, it served the rest of the session from there even
+  // after the preferred Claude account left cooldown — every request paying
+  // the slow translated path while the fast one sat idle.
+  //
+  // So stay on the current account unless something strictly preferred is
+  // now available.
+  if (current && current.state === 'eligible') {
+    const better = candidates.some((a) => a.priority < current.priority);
+    if (!better) return { accountId: current.id, reason: 'sticky' };
+  }
 
   // Lowest priority number first; then prefer an account with a known, sooner
   // reset (spend the one about to refill anyway). Unknown resets sort last
@@ -131,7 +144,20 @@ function apply(a: AccountRuntime, o: Observation, now: Date): AccountRuntime {
 
     case 'rate_limited':
     case 'unavailable': {
-      const streak = o.retryAfterSeconds !== null ? 0 : a.unretryableStreak + 1;
+      // A headerless 429 is only a spend cap when the account is ACTUALLY
+      // spent. Measured: both pooled accounts returned 429 for Sonnet and
+      // Opus while returning 200 for Haiku on the same credential, with the
+      // five-hour window at 5% and 27% and `locked_reason: null`. That is a
+      // model being unavailable, not an account being out of quota — but the
+      // escalating backoff buried an account with 95% of its window left for
+      // up to 30 minutes, and the session fell through to the slow fallback.
+      //
+      // So the streak only escalates when the account looks genuinely spent.
+      // With known headroom the cooldown stays at the base step, which is
+      // long enough to stop a hot loop and short enough that the account
+      // comes back for the next request.
+      const hasHeadroom = a.usagePercent !== null && a.usagePercent < a.switchThreshold;
+      const streak = o.retryAfterSeconds !== null || hasHeadroom ? 0 : a.unretryableStreak + 1;
       return {
         ...a,
         state: 'cooldown',
@@ -177,9 +203,13 @@ export function recoverExpired(snapshot: Snapshot, now: Date): Snapshot {
  * ceiling in about six.
  */
 export function cooldownDeadline(now: Date, retryAfterSeconds: number | null, streak: number): Date {
+  // streak 0 means "no escalation": either a Retry-After was given, or the
+  // account still has quota and this was not a spend cap.
   const seconds =
     retryAfterSeconds !== null
       ? Math.min(retryAfterSeconds, MAX_COOLDOWN_SECONDS)
-      : Math.min(BASE_BACKOFF_SECONDS * 2 ** Math.max(0, streak - 1), MAX_COOLDOWN_SECONDS);
+      : streak === 0
+        ? BASE_BACKOFF_SECONDS
+        : Math.min(BASE_BACKOFF_SECONDS * 2 ** Math.max(0, streak - 1), MAX_COOLDOWN_SECONDS);
   return new Date(now.getTime() + seconds * 1000);
 }

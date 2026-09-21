@@ -50,6 +50,20 @@ export class ProxyServer {
     this.server.keepAliveTimeout = 65_000;
     this.server.headersTimeout = 70_000;
 
+    // Disable Nagle's algorithm on the client socket.
+    //
+    // This is the single largest source of perceived slowness. An SSE token
+    // stream is a long series of tiny writes, and Nagle holds each one back
+    // waiting either for a full segment or for the previous packet to be
+    // ACKed. Paired with delayed-ACK on the receiving side, that adds up to
+    // ~40ms of stall per write — so tokens arrive in visible clumps rather
+    // than smoothly, and a long answer feels far slower than it is, even
+    // though total throughput is unchanged.
+    //
+    // Loopback has no congestion to avoid, so there is nothing to trade away
+    // here: coalescing buys nothing and costs latency on every chunk.
+    this.server.on('connection', (socket) => socket.setNoDelay(true));
+
     return new Promise((resolve, reject) => {
       this.server!.once('error', reject);
       this.server!.listen(port, LOOPBACK, () => {
