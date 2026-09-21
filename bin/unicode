@@ -1,0 +1,28 @@
+#!/usr/bin/env node
+/**
+ * Entry point.
+ *
+ * Node strips TypeScript types natively, so the source runs as-is with no
+ * build step. That is on by default from Node 22.18/24; on Node 20 and early
+ * 22 it needs --experimental-strip-types, which cannot be turned on from
+ * inside an already-running process — so those versions re-exec once with the
+ * flag. Node 24 users pay nothing for this.
+ */
+import { spawnSync } from 'node:child_process';
+import { fileURLToPath } from 'node:url';
+import { dirname, join } from 'node:path';
+
+const cli = join(dirname(fileURLToPath(import.meta.url)), '..', 'src', 'cli', 'index.ts');
+
+try {
+  await import(cli);
+} catch (err) {
+  const message = err instanceof Error ? err.message : String(err);
+  // Older Node: types are not stripped, so the TS syntax fails to parse.
+  if (!/Unexpected token|ERR_UNKNOWN_FILE_EXTENSION|strip-types/i.test(message)) throw err;
+
+  const result = spawnSync(process.execPath, ['--experimental-strip-types', cli, ...process.argv.slice(2)], {
+    stdio: 'inherit',
+  });
+  process.exit(result.status ?? 1);
+}

@@ -1,0 +1,178 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>uniAgents Dashboard</title>
+<link rel="stylesheet" href="style.css">
+</head>
+<body>
+
+<nav class="nav">
+  <div class="nav-in">
+    <div class="brand"><span class="brand-mark">u</span><span>uniAgents</span></div>
+    <button class="tab on" data-p="overview" data-i18n="nav.overview">Overview</button>
+    <button class="tab" data-p="logs" data-i18n="nav.logs">Logs</button>
+    <button class="tab" data-p="settings" data-i18n="nav.settings">Settings</button>
+    <button class="tab" data-p="help" data-i18n="nav.help">Help</button>
+    <div class="nav-r">
+      <select class="sel" id="lang">
+        <option value="en">EN</option><option value="nl">NL</option><option value="de">DE</option>
+      </select>
+      <button class="icon-btn" id="theme" title="Theme">◐</button>
+    </div>
+  </div>
+</nav>
+
+<div class="wrap">
+  <!-- ============ OVERVIEW ============ -->
+  <section class="page on" id="p-overview">
+    <header class="page-head">
+      <h1>uniAgents <span class="slug" data-i18n="ov.slug"></span></h1>
+      <p class="intro" data-i18n="ov.intro"></p>
+    </header>
+    <div class="stats" id="stat-row"></div>
+    <div class="sec-head">
+      <h2 data-i18n="ov.profiles">Profiles</h2>
+      <button class="btn-mini" id="refresh-usage" data-i18n="ov.refresh">Refresh usage</button>
+    </div>
+    <div class="profiles" id="profiles"></div>
+    <div class="order-hint" id="order-hint"></div>
+    <h2 data-i18n="ov.combined">Combined usage</h2>
+    <div class="card strip" id="strip"></div>
+  </section>
+
+  <!-- ============ LOGS ============ -->
+  <section class="page" id="p-logs">
+    <div class="logs">
+        <div class="card sect">
+          <div class="sect-h">
+            <h3 data-i18n="logs.daily">Daily usage</h3>
+          </div>
+          <div id="cals"></div>
+          <div class="cal-scale">
+            <span data-i18n="logs.less">less</span>
+            <i style="background:color-mix(in srgb,var(--line) 38%,transparent)"></i>
+            <i style="background:color-mix(in srgb,var(--accent) 22%,transparent)"></i>
+            <i style="background:color-mix(in srgb,var(--accent) 45%,transparent)"></i>
+            <i style="background:color-mix(in srgb,var(--accent) 70%,transparent)"></i>
+            <i style="background:var(--accent)"></i>
+            <span data-i18n="logs.more">more</span>
+            <span style="margin-left:auto" data-i18n="logs.rel">shaded against each account's own busiest day</span>
+          </div>
+        </div>
+
+        <div class="card sect">
+          <div class="sect-h"><h3 data-i18n="logs.models">Usage by model</h3>
+            <span class="hint" data-i18n="logs.tokens30">tokens · last 30 days</span></div>
+          <div id="models"></div>
+        </div>
+
+        <div class="card sect">
+          <div class="sect-h"><h3 data-i18n="logs.projects">Usage by project</h3>
+            <span class="hint" data-i18n="logs.tokens30">tokens · last 30 days</span></div>
+          <div id="projects"></div>
+        </div>
+
+        <div class="card act">
+          <div class="act-h"><h3 data-i18n="logs.activity">Activity</h3></div>
+          <div class="act-f" id="act-filters"></div>
+          <div class="act-l" id="act-list"></div>
+        </div>
+    </div>
+  </section>
+
+  <!-- ============ SETTINGS ============ -->
+  <section class="page" id="p-settings">
+    <div class="set">
+      <h2 data-i18n="set.accounts">Accounts</h2>
+      <div class="card sect" style="margin-bottom:20px">
+        <div class="srow">
+          <div class="t"><b data-i18n="set.scan">Scan for accounts</b>
+            <span data-i18n="set.scanD">Look for Claude and Codex logins already on this machine. Nothing is written — credentials stay where the official CLIs put them.</span>
+            <div class="scan-result" id="scan-result" hidden></div></div>
+          <button class="btn btn-p" id="scan" data-i18n="set.scanB">Scan now</button>
+        </div>
+        <div class="srow">
+          <div class="t"><b data-i18n="set.multi">Using several accounts</b>
+            <span data-i18n="set.multiD">Each login needs its own config directory, or the second overwrites the first.</span>
+            <div style="margin-top:9px"><code style="font-family:var(--mono);font-size:11.5px;background:var(--panel2);border:1px solid var(--line);padding:3px 8px;border-radius:6px">CLAUDE_CONFIG_DIR=~/.claude-work claude</code></div>
+          </div>
+          <button class="btn" data-i18n="set.guide">Guide</button>
+        </div>
+      </div>
+
+      <h2 data-i18n="set.model">Starting model</h2>
+      <div class="card sect" style="margin-bottom:20px">
+        <p style="margin:0 0 12px;font-size:12.5px;color:var(--dim)" data-i18n="set.modelD">Every model the pool can serve. The one you pick is what new sessions start on.</p>
+        <div id="models"></div>
+        <p style="margin:12px 0 0;font-size:12px;color:var(--dim)" data-i18n="set.modelNote">Applies to the next session, passed as --model. Inside a running session, /model switches freely and nothing here overrides it.</p>
+      </div>
+
+      <h2 data-i18n="set.parity">Model parity</h2>
+      <div class="card sect" style="margin-bottom:20px">
+        <p style="margin:0 0 12px;font-size:12.5px;color:var(--dim)" data-i18n="set.parityD">Which GPT model answers when a Claude model is requested and Codex is serving.</p>
+        <div id="parity"></div>
+      </div>
+
+      <h2 data-i18n="set.res">Live resource usage</h2>
+      <div class="card sect" style="margin-bottom:20px">
+        <div class="t" style="width:100%">
+          <div class="res-grid">
+            <div class="res-card">
+              <span class="res-k" data-i18n="set.resCpu">CPU</span>
+              <span class="res-v" id="cpu-val">—</span>
+            </div>
+            <div class="res-card">
+              <span class="res-k" data-i18n="set.resRam">Memory</span>
+              <span class="res-v" id="ram-val">—</span>
+            </div>
+            <div class="res-card">
+              <span class="res-k" data-i18n="set.resPid">PID</span>
+              <span class="res-v" id="pid-val">—</span>
+            </div>
+            <div class="res-card">
+              <span class="res-k" data-i18n="set.resUp">Session uptime</span>
+              <span class="res-v" id="up-val">—</span>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <h2 data-i18n="set.notif">Notifications</h2>
+      <div class="card sect" style="margin-bottom:20px" id="notifs"></div>
+
+      <h2 data-i18n="set.data">Data</h2>
+      <div class="card sect" style="margin-bottom:20px">
+        <div class="srow">
+          <div class="t"><b data-i18n="set.export">Export configuration</b>
+            <span data-i18n="set.exportD">Profiles and settings as a file. Credentials are never included.</span></div>
+          <button class="btn" data-i18n="set.exportB">Export</button>
+        </div>
+        <div class="srow">
+          <div class="t"><b data-i18n="set.import">Import configuration</b>
+            <span data-i18n="set.importD">Restore settings from an exported file.</span></div>
+          <button class="btn" data-i18n="set.importB">Import</button>
+        </div>
+      </div>
+
+    </div>
+  </section>
+
+  <!-- ============ HELP ============ -->
+  <section class="page" id="p-help">
+    <div class="help">
+      <div class="note" data-i18n-html="help.note"></div>
+      <h2 data-i18n="help.cmds">Commands</h2>
+      <div id="cmds" class="cmds"></div>
+    </div>
+  </section>
+</div>
+
+
+
+<div class="modal" id="modal"></div>
+
+<script src="app.js"></script>
+</body>
+</html>

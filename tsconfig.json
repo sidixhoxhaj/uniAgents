@@ -1,0 +1,33 @@
+{
+  "compilerOptions": {
+    "target": "ES2023",
+    "module": "NodeNext",
+    "moduleResolution": "NodeNext",
+    "lib": ["ES2023"],
+    // No emit: Node runs the TypeScript source directly. tsc is a type
+    // checker here, never a build step.
+    "noEmit": true,
+
+    "strict": true,
+    "noUncheckedIndexedAccess": true,
+    "noImplicitOverride": true,
+    "exactOptionalPropertyTypes": true,
+    "noFallthroughCasesInSwitch": true,
+    "noUnusedLocals": true,
+    "noUnusedParameters": true,
+
+    "verbatimModuleSyntax": true,
+    // Reject syntax Node's strip-only mode cannot run (parameter properties,
+    // enums, namespaces). Without this, tsc accepts code that crashes at
+    // runtime — which it did.
+    "erasableSyntaxOnly": true,
+    "skipLibCheck": true,
+
+    // Node 20+ strips TS types natively, so we run source directly and never
+    // need a build step for development. That requires real `.ts` specifiers
+    // in imports, which tsc only accepts with these two flags.
+    "allowImportingTsExtensions": true,
+    "rewriteRelativeImportExtensions": true
+  },
+  "include": ["src/**/*.ts", "test/**/*.ts"]
+}

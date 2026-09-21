@@ -1,0 +1,406 @@
+:root{
+  --bg:#f7f7f5; --panel:#fff; --panel2:#fbfbfa; --line:#e5e3de; --line2:#efedE8;
+  --ink:#18181a; --dim:#6b6a67; --faint:#96958f;
+  --ok:#2f7d55; --warn:#b3771d; --bad:#b0423a; --accent:#4b5bd7;
+  --codex:#10a37f; --claude:#d97757;
+  --a1:#d97757; --a2:#4b7fd6; --a3:#10a37f; --a4:#8a5cc4; --a5:#c2953a;
+  --mono:ui-monospace,"SF Mono",Menlo,Consolas,monospace;
+  --r:11px; --shadow:0 1px 2px rgba(0,0,0,.04);
+}
+:root[data-theme="dark"],
+:root:not([data-theme="light"]) .dark-probe{}
+@media (prefers-color-scheme:dark){:root:not([data-theme="light"]){
+  --bg:#131315; --panel:#1b1b1e; --panel2:#202024; --line:#2b2b31; --line2:#242429;
+  --ink:#ededf0; --dim:#9b9aa1; --faint:#6f6e78;
+  --ok:#4fca8b; --warn:#dda449; --bad:#e8746b; --accent:#8d99f2;
+  --codex:#2ec4a0; --claude:#e08a6b;
+  --a1:#e08a6b; --a2:#7aa5ea; --a3:#2ec4a0; --a4:#a986e0; --a5:#d9b45c;
+  --shadow:0 1px 2px rgba(0,0,0,.3);
+}}
+:root[data-theme="dark"]{
+  --bg:#131315; --panel:#1b1b1e; --panel2:#202024; --line:#2b2b31; --line2:#242429;
+  --ink:#ededf0; --dim:#9b9aa1; --faint:#6f6e78;
+  --ok:#4fca8b; --warn:#dda449; --bad:#e8746b; --accent:#8d99f2;
+  --codex:#2ec4a0; --claude:#e08a6b;
+  --a1:#e08a6b; --a2:#7aa5ea; --a3:#2ec4a0; --a4:#a986e0; --a5:#d9b45c;
+  --shadow:0 1px 2px rgba(0,0,0,.3);
+}
+
+*{box-sizing:border-box}
+body{margin:0;background:var(--bg);color:var(--ink);
+  font:14px/1.55 ui-sans-serif,-apple-system,"SF Pro Text",Inter,system-ui,sans-serif;
+  -webkit-font-smoothing:antialiased}
+button{font:inherit;color:inherit}
+.num{font-variant-numeric:tabular-nums}
+
+/* ---------- nav ---------- */
+.nav{position:sticky;top:0;z-index:20;background:color-mix(in srgb,var(--bg) 88%,transparent);
+  backdrop-filter:blur(12px);border-bottom:1px solid var(--line)}
+.nav-in{max-width:1180px;margin:0 auto;padding:0 20px;display:flex;align-items:center;gap:4px;height:52px}
+.brand{display:flex;align-items:center;gap:9px;margin-right:16px;font-weight:660;letter-spacing:-.015em}
+.brand-mark{width:24px;height:24px;border-radius:6px;background:var(--accent);color:#fff;
+  display:grid;place-items:center;font-size:12px;font-weight:800}
+.tab{background:none;border:none;padding:6px 11px;border-radius:8px;color:var(--dim);
+  font-size:13.5px;font-weight:530;cursor:pointer}
+.tab:hover{background:var(--line2);color:var(--ink)}
+.tab.on{background:var(--panel);color:var(--ink);font-weight:600;box-shadow:var(--shadow);
+  border:1px solid var(--line)}
+.nav-r{margin-left:auto;display:flex;align-items:center;gap:6px}
+.sel,.icon-btn{background:var(--panel);border:1px solid var(--line);border-radius:8px;
+  color:var(--dim);font-size:12.5px;padding:5px 9px;cursor:pointer}
+.sel{-webkit-appearance:none;appearance:none;padding-right:24px;font-weight:600;
+  background-image:linear-gradient(45deg,transparent 50%,currentColor 50%),
+                   linear-gradient(135deg,currentColor 50%,transparent 50%);
+  background-position:right 11px center,right 6px center;
+  background-size:5px 5px,5px 5px;background-repeat:no-repeat}
+.sel option{background:var(--panel);color:var(--ink)}
+.icon-btn{width:31px;height:29px;display:grid;place-items:center;padding:0}
+.sel:hover,.icon-btn:hover{color:var(--ink);border-color:var(--dim)}
+
+/* ---------- layout ---------- */
+.wrap{max-width:1180px;margin:0 auto;padding:24px 20px 70px}
+.page{display:none} .page.on{display:block}
+h2{font-size:11px;letter-spacing:.09em;text-transform:uppercase;color:var(--faint);
+  font-weight:700;margin:0 0 10px}
+.card{background:var(--panel);border:1px solid var(--line);border-radius:var(--r);
+  box-shadow:var(--shadow)}
+
+/* ---------- overview: page header ---------- */
+.page-head{margin-bottom:32px}
+.page-head h1{font-size:45px;font-weight:700;letter-spacing:-.035em;margin:0;line-height:1.15;display:flex;align-items:baseline;gap:22px;flex-wrap:wrap}
+.slug{font-size:25px;font-weight:500;letter-spacing:-.02em;color:var(--dim)}
+.intro{margin:14px 0 0;font-size:16px;color:var(--dim);line-height:1.6}
+
+/* ---------- overview: stat row ---------- */
+.stats{display:grid;grid-template-columns:1fr 1fr 1fr;gap:10px;margin-bottom:22px}
+.stat{padding:15px 17px}
+.stat .k{font-size:11px;letter-spacing:.07em;text-transform:uppercase;color:var(--faint);
+  font-weight:670;margin-bottom:9px;display:flex;align-items:center;gap:7px}
+.stat .v{font-size:23px;font-weight:660;letter-spacing:-.025em;line-height:1.1}
+.stat .s{font-size:12px;color:var(--dim);margin-top:5px}
+.dot{width:7px;height:7px;border-radius:50%;background:var(--ok);flex:none;
+  box-shadow:0 0 0 3px color-mix(in srgb,var(--ok) 22%,transparent)}
+.dot.idle{background:var(--faint);box-shadow:none}
+.mini-av{display:flex;gap:-4px}
+.mini-av span{width:20px;height:20px;border-radius:5px;display:grid;place-items:center;
+  border:1.5px solid var(--panel);margin-left:-5px}
+.mini-av span:first-child{margin-left:0}
+.mini-av svg{width:11px;height:11px}
+
+/* ---------- profile cards ---------- */
+.profiles{display:flex;flex-direction:column;gap:9px;margin-bottom:8px}
+.order-hint{font-size:11.5px;color:var(--dim);margin-bottom:22px;line-height:1.5;
+  display:flex;align-items:center;gap:8px;padding:9px 13px;border-radius:9px;
+  background:var(--panel2);border:1px solid var(--line)}
+.order-hint .grip{cursor:default;font-size:13px}
+/* Full width: identity on the left, windows on the right, rather than stacked. */
+.prof{display:grid;grid-template-columns:minmax(220px,1fr) minmax(280px,1.4fr);gap:24px;
+  align-items:center;min-height:96px}
+@media(max-width:820px){.prof{grid-template-columns:1fr;gap:14px}}
+.prof{padding:15px 17px;position:relative;overflow:hidden}
+.prof::before{content:"";position:absolute;left:0;top:0;bottom:0;width:3px;background:var(--c)}
+.prof.active{box-shadow:0 0 0 1px var(--accent) inset,var(--shadow)}
+.ptop{display:flex;align-items:center;gap:10px;min-width:0}
+.grip{color:var(--faint);font-size:14px;cursor:grab;flex:none;letter-spacing:-2px;
+  user-select:none;line-height:1}
+.grip:active{cursor:grabbing}
+.ord{width:19px;height:19px;border-radius:5px;flex:none;display:grid;place-items:center;
+  font-size:10.5px;font-weight:700;color:var(--c);
+  background:color-mix(in srgb,var(--c) 15%,transparent)}
+.prof.dragging{opacity:.45}
+/* Where the card will land. */
+.prof.over{box-shadow:0 -2px 0 var(--accent),var(--shadow)}
+.prof[draggable]{cursor:default}
+.av{width:27px;height:27px;border-radius:7px;display:grid;place-items:center;flex:none;
+  background:color-mix(in srgb,var(--c) 15%,transparent);color:var(--c)}
+.av svg{width:15px;height:15px;display:block}
+.pname{font-weight:620;font-size:13.5px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.palias{display:block;font-size:11px;font-weight:450;color:var(--faint);margin-top:1px}
+.pplan{font-size:11.5px;color:var(--faint)}
+.pill{font-size:10px;padding:2px 7px;border-radius:99px;font-weight:680;letter-spacing:.04em;
+  text-transform:uppercase;flex:none;margin-left:auto}
+.edit{background:none;border:1px solid var(--line);border-radius:7px;width:26px;height:26px;
+  display:grid;place-items:center;color:var(--faint);cursor:pointer;font-size:12px;flex:none}
+.edit:hover{color:var(--ink);border-color:var(--dim);background:var(--panel2)}
+.sw-s{width:32px;height:19px;border-radius:99px;background:var(--line);border:none;flex:none;
+  position:relative;cursor:pointer;transition:background .2s}
+.sw-s::after{content:"";position:absolute;top:2.5px;left:2.5px;width:14px;height:14px;
+  border-radius:50%;background:#fff;transition:transform .2s;box-shadow:0 1px 3px rgba(0,0,0,.28)}
+.sw-s.on{background:var(--c)} .sw-s.on::after{transform:translateX(13px)}
+/* A disabled account stays visible but reads as out of the pool. */
+.prof.off{opacity:.55} .prof.off::before{background:var(--faint)}
+.pill-ok{background:color-mix(in srgb,var(--ok) 15%,transparent);color:var(--ok)}
+.pill-warn{background:color-mix(in srgb,var(--warn) 17%,transparent);color:var(--warn)}
+.pill-bad{background:color-mix(in srgb,var(--bad) 14%,transparent);color:var(--bad)}
+.pill-idle{background:color-mix(in srgb,var(--faint) 16%,transparent);color:var(--faint)}
+.wins{display:grid;grid-template-columns:1fr 1fr;gap:13px;align-items:center;min-width:0}
+.wins.one{grid-template-columns:1fr}
+.wins > div{display:flex;flex-direction:column;justify-content:center}
+.wlab{display:flex;justify-content:space-between;gap:8px;font-size:11.5px;color:var(--dim);margin-bottom:5px}
+.wlab b{color:var(--ink);font-weight:660}
+.trk{height:5px;background:color-mix(in srgb,var(--line) 75%,transparent);border-radius:99px;overflow:hidden}
+.fil{height:100%;border-radius:99px;background:var(--c);transition:width .5s}
+.wsub{font-size:11px;color:var(--faint);margin-top:5px;min-height:15px}
+
+/* ---------- combined usage strip ---------- */
+.strip{padding:16px 18px}
+.strip-head{display:flex;align-items:baseline;gap:10px;margin-bottom:11px}
+.strip-prov{display:flex;align-items:center;gap:20px}
+.prov{display:flex;align-items:center;gap:8px;color:var(--c)}
+.prov svg{width:17px;height:17px;flex:none}
+.prov b{font-size:22px;font-weight:660;letter-spacing:-.025em;line-height:1;color:var(--ink)}
+.strip-sub{margin-left:auto;font-size:11.5px;color:var(--faint)}
+.strip-bar{display:flex;height:11px;border-radius:99px;overflow:hidden;gap:2px;margin-bottom:13px;
+  background:color-mix(in srgb,var(--line) 55%,transparent)}
+.strip-bar i{display:block;background:var(--c);border-radius:3px;transition:width .5s}
+/* The unfilled remainder is the headroom, so it reads as empty, not as a colour. */
+.strip-bar{background:none}
+.legend{display:flex;flex-wrap:wrap;gap:16px}
+.lg{display:flex;align-items:center;gap:7px;font-size:12px}
+.lg .sw{width:9px;height:9px;border-radius:3px;background:var(--c);flex:none}
+.lg b{font-weight:640}
+.lg span{color:var(--faint)}
+
+/* ---------- logs ---------- */
+.logs{display:block}
+
+.sect{padding:16px 18px;margin-bottom:12px}
+.sect-h{display:flex;align-items:center;gap:9px;margin-bottom:14px}
+.sect-h h3{font-size:13.5px;font-weight:640;margin:0}
+.sect-h .hint{margin-left:auto;font-size:11.5px;color:var(--faint)}
+
+.cal-row{padding:16px 0;border-bottom:1px solid var(--line2);
+  display:grid;grid-template-columns:minmax(200px,1fr) auto;gap:26px;align-items:start}
+@media(max-width:860px){.cal-row{grid-template-columns:1fr}}
+/* Both months side by side; they stack before the cells get cramped. */
+.cal-months{display:flex;gap:18px;flex-wrap:wrap}
+.cal-month{min-width:0}
+.cal-mname{font-size:11px;font-weight:700;letter-spacing:.06em;text-transform:uppercase;
+  color:var(--faint);margin-bottom:7px}
+.cal-side{padding-top:2px}
+.cal-row:first-child{padding-top:2px}
+.cal-row:last-child{border-bottom:none;padding-bottom:2px}
+.cal-top{display:flex;align-items:center;gap:8px;margin-bottom:9px}
+.av-s{width:22px;height:22px;border-radius:6px;display:grid;place-items:center;flex:none;
+  background:color-mix(in srgb,var(--c) 15%,transparent);color:var(--c)}
+.av-s svg{width:12px;height:12px;display:block}
+.cal-top b{font-weight:620;font-size:13px}
+.cal-id{margin-bottom:13px}
+.cal-prod{display:flex;align-items:center;gap:8px;margin-bottom:5px}
+.cal-prod b{font-size:13.5px;font-weight:640;letter-spacing:-.01em}
+.cal-plan{font-size:11px;font-weight:650;text-transform:uppercase;letter-spacing:.05em;
+  color:var(--c);margin-bottom:3px}
+.cal-who{font-size:11.5px;color:var(--faint);word-break:break-all;line-height:1.35}
+.cal-stats{display:grid;grid-template-columns:1fr 1fr;gap:7px}
+.cal-stat{background:var(--panel2);border:1px solid var(--line);border-radius:9px;
+  padding:9px 11px;line-height:1.2;min-width:0}
+.cal-stat b{display:block;font-size:15px;font-weight:660;letter-spacing:-.015em;
+  white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.cal-stat span{font-size:9.5px;color:var(--faint);text-transform:uppercase;
+  letter-spacing:.05em;display:block;margin-top:2px}
+@media(max-width:1100px){.cal-stats{grid-template-columns:1fr 1fr}}
+.cal-top .tot b{display:block;font-size:14px;font-weight:660;letter-spacing:-.01em}
+.cal-top .tot span{font-size:10.5px;color:var(--faint);text-transform:uppercase;letter-spacing:.05em}
+
+/* Weekday header sits above a 7-column month grid, so days line up in weeks. */
+.cal-hd{display:grid;grid-template-columns:repeat(7,1fr);gap:3px;margin-bottom:4px;width:196px}
+.cal-hd span{font-size:8.5px;font-weight:700;letter-spacing:.06em;text-transform:uppercase;
+  color:var(--faint);text-align:center}
+.cal{display:grid;grid-template-columns:repeat(7,1fr);gap:3px;width:196px}
+.day{aspect-ratio:1;border-radius:5px;position:relative;cursor:default;
+  background:color-mix(in srgb,var(--c) var(--i),transparent);
+  border:1px solid color-mix(in srgb,var(--line) 55%,transparent);
+  display:grid;place-items:center;transition:transform .12s,box-shadow .12s}
+.day.pad{background:none;border:none;pointer-events:none}
+.day.zero{background:color-mix(in srgb,var(--line) 38%,transparent)}
+.day.future{background:none;border-style:dashed;opacity:.5}
+.day .n{font-size:9px;font-weight:600;color:var(--ink);opacity:.5;pointer-events:none}
+.day.hot .n{color:#fff;opacity:.95;text-shadow:0 1px 2px rgba(0,0,0,.25)}
+.day:not(.pad):hover{transform:scale(1.13);z-index:6;
+  box-shadow:0 0 0 2px var(--accent),0 4px 12px rgba(0,0,0,.14)}
+.day:not(.pad):hover::after{content:attr(data-t);position:absolute;bottom:calc(100% + 9px);left:50%;
+  transform:translateX(-50%);background:var(--ink);color:var(--bg);font-size:11px;
+  padding:6px 10px;border-radius:7px;white-space:nowrap;z-index:10;font-family:var(--mono);
+  box-shadow:0 6px 18px rgba(0,0,0,.22);font-weight:500}
+.day:not(.pad):hover::before{content:"";position:absolute;bottom:calc(100% + 4px);left:50%;
+  transform:translateX(-50%);border:5px solid transparent;border-top-color:var(--ink);z-index:10}
+.cal-scale{display:flex;align-items:center;gap:5px;margin-top:14px;font-size:10.5px;color:var(--faint)}
+.cal-scale i{width:13px;height:13px;border-radius:4px;display:block;
+  border:1px solid color-mix(in srgb,var(--line) 55%,transparent)}
+.mrow{display:grid;grid-template-columns:150px 1fr 88px;gap:12px;align-items:center;
+  padding:8px 0;border-bottom:1px solid var(--line2);font-size:12.5px}
+.mrow:last-child{border-bottom:none}
+.mname{display:flex;align-items:center;gap:8px;min-width:0}
+.mname svg{width:13px;height:13px;flex:none;color:var(--c)}
+.mname span{white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.mbar{height:7px;background:color-mix(in srgb,var(--line) 70%,transparent);border-radius:99px;overflow:hidden}
+.mbar i{display:block;height:100%;background:var(--c);border-radius:99px}
+.mval{text-align:right;color:var(--dim);font-size:12px}
+
+/* ---------- activity ---------- */
+.act{padding:0;margin-bottom:12px}
+.act-h{padding:14px 16px 11px;border-bottom:1px solid var(--line);display:flex;align-items:center;gap:8px}
+.act-h h3{font-size:13.5px;font-weight:640;margin:0}
+.act-f{display:flex;gap:4px;padding:10px 14px;border-bottom:1px solid var(--line);flex-wrap:wrap}
+.chip{font-size:10.5px;padding:3px 8px;border-radius:99px;border:1px solid var(--line);
+  background:none;color:var(--dim);cursor:pointer;font-weight:600}
+.chip.on{background:var(--ink);color:var(--bg);border-color:var(--ink)}
+.act-l{max-height:300px;overflow-y:auto}
+.ev{padding:10px 14px;border-bottom:1px solid var(--line2);font-size:11.5px}
+.ev:last-child{border-bottom:none}
+/* Title 70%, tag 30%, both centred on the same line. */
+.ev-top{display:grid;grid-template-columns:70% 1fr;gap:8px;align-items:center}
+/* The category reads as a tag, tinted by its own colour, with the time
+   pushed to the opposite end so the two never compete. */
+.ev-tag{font-size:9px;font-weight:720;text-transform:uppercase;letter-spacing:.06em;
+  padding:2.5px 7px;border-radius:99px;justify-self:end;text-align:center;
+  background:color-mix(in srgb,currentColor 14%,transparent);
+  white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:100%}
+.ev-t{font-family:var(--mono);color:var(--faint);font-size:10px;margin-top:4px}
+/* One colour per category, used for both the tag text and its tint. */
+.k-session{color:var(--accent)} .k-rotation{color:var(--claude)}
+.k-config{color:var(--dim)} .k-error{color:var(--bad)} .k-general{color:var(--codex)}
+.ev-x{color:var(--ink);line-height:1.4;min-width:0;overflow-wrap:anywhere;
+  display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden}
+.ev-m{color:var(--faint);font-size:11px;margin-top:3px;line-height:1.45}
+
+/* ---------- settings ---------- */
+.set{max-width:none}
+  /* A settings row's description should not run the full page width. */
+  .srow .t span{max-width:60ch}
+.srow{display:flex;align-items:flex-start;gap:16px;padding:14px 0;border-bottom:1px solid var(--line2)}
+.srow:last-child{border-bottom:none}
+.srow .t{flex:1;min-width:0}
+.srow .t b{display:block;font-size:13.5px;font-weight:600;margin-bottom:3px}
+.srow .t span{font-size:12.5px;color:var(--dim);line-height:1.5}
+.btn{background:var(--panel2);border:1px solid var(--line);border-radius:8px;padding:6px 13px;
+  font-size:12.5px;font-weight:560;cursor:pointer;white-space:nowrap}
+.btn:hover{border-color:var(--dim)}
+.btn-p{background:var(--accent);border-color:var(--accent);color:#fff}
+.btn-d{color:var(--bad);border-color:color-mix(in srgb,var(--bad) 40%,var(--line))}
+.btn-d:hover{background:color-mix(in srgb,var(--bad) 10%,transparent);border-color:var(--bad)}
+.sw-t{width:38px;height:22px;border-radius:99px;background:var(--line);border:none;
+  position:relative;cursor:pointer;flex:none;transition:background .2s}
+.sw-t::after{content:"";position:absolute;top:3px;left:3px;width:16px;height:16px;border-radius:50%;
+  background:#fff;transition:transform .2s;box-shadow:0 1px 3px rgba(0,0,0,.25)}
+.sw-t.on{background:var(--ok)} .sw-t.on::after{transform:translateX(16px)}
+.par{display:grid;grid-template-columns:1fr 26px 1fr 110px;gap:10px;align-items:center;
+  padding:8px 0;border-bottom:1px solid var(--line2);font-size:12.5px}
+.par-h{padding:0 0 7px;border-bottom:1px solid var(--line);font-size:10px;font-weight:700;
+  text-transform:uppercase;letter-spacing:.06em;color:var(--faint)}
+.par-h span:last-child{text-align:right}
+.psel{font:inherit;font-size:12.5px;font-weight:500;padding:6px 26px 6px 10px;border-radius:8px;
+  border:1px solid var(--line);background:var(--panel2);color:var(--ink);cursor:pointer;
+  min-width:0;width:100%;
+  /* Strip the OS chrome and draw our own chevron, so it matches the theme. */
+  -webkit-appearance:none;appearance:none;
+  background-image:linear-gradient(45deg,transparent 50%,currentColor 50%),
+                   linear-gradient(135deg,currentColor 50%,transparent 50%);
+  background-position:right 12px center,right 7px center;
+  background-size:5px 5px,5px 5px;background-repeat:no-repeat;
+  transition:border-color .15s,box-shadow .15s}
+.psel:hover{border-color:var(--dim);background-color:var(--panel)}
+.psel:focus-visible{outline:none;border-color:var(--accent);
+  box-shadow:0 0 0 3px color-mix(in srgb,var(--accent) 16%,transparent)}
+.psel option{background:var(--panel);color:var(--ink)}
+
+/* Effort is derived from the model, so it reads as a value, not a control. */
+.eff-auto{justify-self:end;font-size:9.5px;font-weight:700;text-transform:uppercase;
+  letter-spacing:.06em;color:var(--faint);cursor:help;
+  background:color-mix(in srgb,var(--faint) 15%,transparent);padding:3px 9px;border-radius:99px}
+/* The pair is an equivalence, so the arrow points both ways. */
+.par .ar{font-size:15px;cursor:help}
+.par:last-child{border-bottom:none}
+.par .ar{color:var(--faint);text-align:center}
+.par .m{display:flex;align-items:center;gap:7px;min-width:0}
+.par .m svg{width:13px;height:13px;flex:none}
+.par .m.c svg{color:var(--claude)} .par .m.g svg{color:var(--codex)}
+.res-grid{display:grid;grid-template-columns:repeat(4,1fr);gap:10px}
+@media(max-width:700px){.res-grid{grid-template-columns:repeat(2,1fr)}}
+.res-card{display:flex;flex-direction:column;gap:5px;min-width:0;padding:11px 12px;
+  background:var(--panel2);border:1px solid var(--line);border-radius:9px}
+.res-k{font-size:10.5px;letter-spacing:.04em;text-transform:uppercase;color:var(--faint)}
+/* Tabular figures: a per-second refresh must not make the row jiggle. */
+.res-v{font-family:var(--mono);font-size:15px;color:var(--fg);font-variant-numeric:tabular-nums;
+  white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+
+/* ---------- help ---------- */
+.help{max-width:none}
+  .cmds{display:grid;grid-template-columns:1fr 1fr;gap:9px}
+  .cmd{margin-bottom:0}
+  @media(max-width:900px){.cmds{grid-template-columns:1fr}}
+  .note{max-width:80ch}
+.cmd{background:var(--panel);border:1px solid var(--line);border-radius:var(--r);
+  padding:14px 16px;margin-bottom:9px;box-shadow:var(--shadow)}
+.cmd-t{display:flex;align-items:center;gap:10px;margin-bottom:7px}
+.cmd code{font-family:var(--mono);font-size:12.5px;background:var(--panel2);
+  border:1px solid var(--line);padding:3px 9px;border-radius:6px;font-weight:600}
+.cmd .copy{margin-left:auto;background:none;border:1px solid var(--line);border-radius:6px;
+  padding:3px 9px;font-size:11px;color:var(--dim);cursor:pointer}
+.cmd .copy:hover{color:var(--ink);border-color:var(--dim)}
+.cmd p{margin:0;font-size:12.5px;color:var(--dim);line-height:1.55}
+.note{background:color-mix(in srgb,var(--accent) 7%,transparent);
+  border:1px solid color-mix(in srgb,var(--accent) 25%,transparent);
+  border-radius:var(--r);padding:13px 16px;font-size:12.5px;color:var(--dim);line-height:1.6;margin-bottom:16px}
+.note b{color:var(--ink)}
+@media(max-width:820px){.stats{grid-template-columns:1fr}
+  .page-head h1{font-size:32px}.slug{font-size:19px}.intro{font-size:14.5px}}
+
+
+/* ---------- modal ---------- */
+.modal{position:fixed;inset:0;z-index:50;display:none;place-items:center;padding:20px;
+  background:color-mix(in srgb,#000 42%,transparent);backdrop-filter:blur(3px)}
+.modal.on{display:grid}
+.modal-card{background:var(--panel);border:1px solid var(--line);border-radius:14px;
+  width:min(420px,100%);padding:20px 22px 18px;
+  box-shadow:0 18px 50px rgba(0,0,0,.26),0 2px 8px rgba(0,0,0,.1);
+  animation:pop .16s ease-out}
+@keyframes pop{from{opacity:0;transform:translateY(6px) scale(.985)}to{opacity:1}}
+@media(prefers-reduced-motion:reduce){.modal-card{animation:none}}
+.modal-h{display:flex;align-items:center;gap:11px;margin-bottom:17px}
+.modal-h .av-s{width:30px;height:30px;border-radius:8px;
+  background:color-mix(in srgb,var(--c) 15%,transparent);color:var(--c)}
+.modal-h .av-s svg{width:16px;height:16px}
+.modal-h b{display:block;font-size:14.5px;font-weight:640;letter-spacing:-.01em}
+.modal-h span{display:block;font-size:11.5px;color:var(--faint);margin-top:1px}
+.modal-l{display:block;font-size:11px;font-weight:660;text-transform:uppercase;
+  letter-spacing:.05em;color:var(--faint);margin-bottom:6px}
+.modal-in{width:100%;font:inherit;font-size:14px;padding:9px 12px;border-radius:9px;
+  border:1px solid var(--line);background:var(--panel2);color:var(--ink)}
+.modal-in:focus{outline:none;border-color:var(--accent);
+  box-shadow:0 0 0 3px color-mix(in srgb,var(--accent) 18%,transparent)}
+.modal-in::placeholder{color:var(--faint)}
+.modal-hint{margin:8px 0 0;font-size:11.5px;color:var(--faint);line-height:1.5}
+.modal-f{display:flex;justify-content:flex-end;gap:8px;margin-top:18px}
+
+.scan-result{margin-top:9px;font-size:12px;padding:7px 11px;border-radius:8px;
+  background:color-mix(in srgb,var(--ok) 11%,transparent);color:var(--ok);font-weight:550}
+.scan-result.none{background:color-mix(in srgb,var(--faint) 13%,transparent);color:var(--dim)}
+.scan-result.bad{background:color-mix(in srgb,var(--bad) 11%,transparent);color:var(--bad)}
+
+
+/* Empty states. Used wherever a panel has genuinely nothing to show — it must
+   read as "nothing happened yet", not as a panel that failed to load. */
+.empty{display:flex;align-items:center;justify-content:center;gap:8px;
+  padding:26px 18px;text-align:center;color:var(--faint);font-size:12.5px;line-height:1.6}
+.empty::before{content:"—";opacity:.5;font-size:14px}
+/* Inside the activity column the card is already padded, so it sits tighter. */
+.act-l .empty{padding:32px 18px}
+.empty code{font-family:var(--mono);font-size:12px;
+  background:color-mix(in srgb,var(--line) 45%,transparent);padding:2px 7px;border-radius:5px}
+
+/* A section heading with an action on the right. h2 carries its own bottom
+   margin, so the row owns the spacing instead. */
+.sec-head{display:flex;align-items:center;justify-content:space-between;gap:12px;margin-bottom:10px}
+.sec-head h2{margin:0}
+.btn-mini{background:var(--panel);border:1px solid var(--line);border-radius:7px;
+  color:var(--dim);font-size:11.5px;font-weight:550;padding:4px 10px;cursor:pointer;
+  display:flex;align-items:center;gap:6px}
+.btn-mini:hover{color:var(--ink);border-color:var(--dim)}
+.btn-mini[disabled]{opacity:.55;cursor:default}
+.btn-mini::before{content:"\21bb";font-size:12px}
+.btn-mini.spin::before{display:inline-block;animation:spin .8s linear infinite}
+@keyframes spin{to{transform:rotate(360deg)}}
+@media(prefers-reduced-motion:reduce){.btn-mini.spin::before{animation:none}}
+
+

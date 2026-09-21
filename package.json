@@ -1,0 +1,34 @@
+{
+  "name": "uniagents",
+  "version": "0.1.0",
+  "description": "Pools the Claude accounts already on your machine into one continuous session. No login, no stored state.",
+  "type": "module",
+  "bin": {
+    "unicode": "./bin/unicode"
+  },
+  "engines": {
+    "node": ">=20"
+  },
+  "os": [
+    "darwin",
+    "linux"
+  ],
+  "files": [
+    "bin",
+    "src",
+    "docs",
+    "README.md"
+  ],
+  "scripts": {
+    "test": "node --test --experimental-strip-types test/*.test.ts",
+    "typecheck": "tsc -p tsconfig.json --noEmit"
+  },
+  "//": "ZERO runtime dependencies, deliberately. This process reads your auth tokens and proxies them upstream; an empty supply chain is a security property worth more than a nicer HTTP client API. node:https with keepAlive gives us connection pooling, and its headers-before-body event model is a better fit for the no-retry-after-commit rule than any promise-based client. TypeScript is dev-only and never ships.",
+  "dependencies": {},
+  "devDependencies": {
+    "@types/node": "^22.0.0",
+    "typescript": "^5.6.0"
+  },
+  "license": "MIT",
+  "private": true
+}
